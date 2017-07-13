@@ -1,0 +1,17 @@
+enclave
+{
+    trusted
+    {
+        
+        public void ecall_encrypt([in,out, count=size] uint8_t *plain,[in, out, count=size]uint8_t* crypt, size_t size);
+        public void ecall_decrypt([in,out, count=size] uint8_t *crypt,[in, out, count=size]uint8_t* plain, size_t size);
+        
+        public void ecall_array_in_out([in, out] int arr[4]);
+        
+    };
+    untrusted
+    {
+        void ocall_print_string([in, string] const char *str);
+        void ocall_print_uint([in, count=size]uint8_t * u, size_t size);
+    };
+};
