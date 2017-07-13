@@ -274,6 +274,42 @@ int decrypt_file(const char * path)
     cout << "decrypted the file" << endl;
 }
 
+
+void ocall_save_ctx(const char * path, uint8_t *data, size_t size)
+{
+    fstream file(path, ios::in|ios::out|ios::binary);
+    int file_size = 0;
+   
+    if(file.is_open())
+    {
+        file.seekg(0, ios::beg);    
+        file.write(reinterpret_cast<char *>(data), (streamsize)size);        
+
+        file.close();
+    }
+
+    cout << "seal secret from enclave --> disk file" << endl;
+}
+
+void ocall_get_secret(const char * path, uint8_t *data, size_t size)
+{
+    fstream file(path, ios::in|ios::out|ios::binary);
+    int file_size = 0;
+   
+    if(file.is_open())
+    {
+        
+        file.seekg(0, file.end);
+        file_size = static_cast<int> (file.tellg());
+        file.seekg(0, ios::beg);    
+        file.read(reinterpret_cast<char *>(data), (streamsize)file_size);        
+
+        file.close();
+    }
+    cout << "getting secret from disk file --> enclave" << endl;
+}
+
+
 int main(int argc, char * argv[])
 {
     cout << "demo start..." << endl;

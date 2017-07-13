@@ -10,8 +10,24 @@
 #include <sgx_tseal.h>
 #include <sgx_utils.h>
 #include <sgx_tcrypto.h>
+#define KEYLEN  16
+#define IVLEN   12
+#define GMACLEN 16
+
+const char * path = "encryptcontext";
+
 uint8_t gmac_out[16];
 const uint8_t key[16]={'1'};
+
+typedef struct encrypt_ctx
+{
+    uint8_t key[KEYLEN];
+    uint8_t iv[IVLEN];
+    uint8_t gmac[GMACLEN];
+}encrypt_ctx;
+
+encrypt_ctx ctx;
+
 /* 
  * printf: 
  *   Invokes OCALL to display the enclave buffer to the terminal.
@@ -95,31 +111,20 @@ void ecall_array_in_out(int arr[4])
         0,
         &mac_out
     );
-    ocall_print_uint(delove,8);
-
-    // CBLAS_LAYOUT    layout;
-    // CBLAS_TRANSPOSE transA, transB;
-
-    // const int M=4;//A的行数，C的行数
-    // const int N=2;//B的列数，C的列数
-    // const int K=3;//A的列数，B的行数
-    // const float alpha=1;
-    // const float beta=0;
-    // const int lda=K;//A的列
-    // const int ldb=N;//B的列
-    // const int ldc=N;//C的列
-    // const float A[12]={1,2,3,4,5,6,7,8,9,8,7,6};
-    // const float B[6]={5,4,3,2,1,0};
-    // float C[8];
-    //If we use mkl in enclave, we can not link enclave.so successfully.
-    //cblas_sgemm(layout, transA, transB, M, N, K, alpha, A, lda, B, ldb, beta, C, ldc);
-     
+    ocall_print_uint(delove,8);    
 }
+
+
+/*ecall function for file encrypt
+* crypt: encrypted file buffer
+* plain: Plain text buffer
+* size:  plain size
+*/
 
 void ecall_encrypt(uint8_t *plain, uint8_t *crypt, size_t size)
 {
-
-    uint32_t ret =0;
+    sgx_status_t ret = SGX_ERROR_UNEXPECTED;
+    
     uint8_t iv[12]={0};
     uint8_t mac_out[16];
     ret = sgx_rijndael128GCM_encrypt(
@@ -135,10 +140,16 @@ void ecall_encrypt(uint8_t *plain, uint8_t *crypt, size_t size)
     );
 
 }
+
+/*ecall function for file decrypt
+* crypt: encrypted file buffer
+* plain: Plain text buffer
+* size:  crypt size
+*/
 void ecall_decrypt(uint8_t *crypt, uint8_t *plain, size_t size)
 {
-
-    uint32_t ret =0;
+    sgx_status_t ret = SGX_ERROR_UNEXPECTED;
+    
     uint8_t iv[12]={0};
     uint8_t mac_out[16];
     ret = sgx_rijndael128GCM_decrypt(
@@ -155,3 +166,84 @@ void ecall_decrypt(uint8_t *crypt, uint8_t *plain, size_t size)
 
 }
 
+
+/*generate AES key
+    key: buffer to store key
+    size: key size
+*/
+void generate_key(uint8_t * key, size_t size)
+{
+    sgx_status_t ret = SGX_ERROR_UNEXPECTED;
+    ret = sgx_read_rand(key , size);
+}
+
+/*generate AES IV
+    key: buffer to store IV
+    size: IV size
+*/
+void generate_iv(uint8_t * iv, size_t size)
+{
+    sgx_status_t ret = SGX_ERROR_UNEXPECTED;
+    ret = sgx_read_rand(iv, size);
+}
+
+/*initialize encrypt context
+    
+*/
+void encrypt_ctx_init()
+{
+    if()
+    {
+        generate_iv(ctx.iv, IVLEN);
+        generate_key(ctx.key, KEYLEN);
+        for (int i = 0; i < GMACLEN; ++i)
+        {
+            ctx.gmac[i]=0;
+        }
+        encrypt_ctx_seal();
+    }else{
+        encrypt_ctx_unseal();
+    }
+}
+
+/*seal context to disk file
+*/
+void encrypt_ctx_seal()
+{
+
+    size_t size = sgx_calc_sealed_data_size(0,sizeof(ctx));
+    uint8_t * temp = malloc(sizeof(ctx));
+    uint8_t * sealeddata = malloc(size*sizeof(uint8_t);
+    memcpy(temp, &ctx, sizeof(ctx));
+    ret = sgx_seal_data(
+        0, 
+        NULL, 
+        sizeof(ctx),
+        (uint8_t *)temp,
+        size, 
+        (sgx_sealed_data_t *)sealeddata
+        );
+
+    ocall_save_ctx(path, sealeddata, size);
+}
+
+/*unseal context from disk file
+*/
+void encrypt_ctx_unseal()
+{
+    size_t size = sgx_calc_sealed_data_size(0,sizeof(ctx));
+    uint8_t * data = malloc(size*sizeof(uint8_t));
+    uint8_t * temp = malloc(sizeof(ctx)); 
+    
+    /*get secret from disk file*/
+    ocall_get_secret(path, data, size);
+    
+    ret = sgx_unseal_data(
+        (const sgx_sealed_data_t*)data,
+        NULL, 
+        0,
+        temp,
+        &length
+        );
+    memcpy(&ctx, temp, sizeof(ctx));
+}
